@@ -1,11 +1,13 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -92,4 +94,46 @@ func buildChannelDurationHistogram(rows []map[string]any, now time.Time, buckets
 	}
 
 	return histogram, skipped
+}
+
+// channelRowsPayload mirrors the JSON shape of "api show channels as json".
+type channelRowsPayload struct {
+	RowCount int              `json:"row_count"`
+	Rows     []map[string]any `json:"rows"`
+}
+
+// decodeChannelRows decodes the channel rows JSON payload into a slice of maps.
+func decodeChannelRows(payload []byte) ([]map[string]any, error) {
+	var p channelRowsPayload
+
+	if err := json.Unmarshal(payload, &p); err != nil {
+		return nil, fmt.Errorf("cannot decode channel rows JSON: %w", err)
+	}
+
+	return p.Rows, nil
+}
+
+// channelDurationMetrics fetches channels, builds an age histogram, and emits it.
+func (c *Collector) channelDurationMetrics(ch chan<- prometheus.Metric) error {
+	response, err := c.fsCommand("api show channels as json")
+
+	if err != nil {
+		return err
+	}
+
+	rows, err := decodeChannelRows(response)
+
+	if err != nil {
+		return err
+	}
+
+	histogram, skipped := buildChannelDurationHistogram(rows, time.Now(), c.channelDurationBuckets)
+
+	if skipped > 0 {
+		level.Debug(c.logger).Log("msg", "skipped unparseable channel row", "count", skipped)
+	}
+
+	ch <- histogram
+
+	return nil
 }
