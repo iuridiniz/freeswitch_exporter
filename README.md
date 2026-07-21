@@ -227,7 +227,7 @@ List of exposed metrics:
 
 ### Channel duration histogram (zombie channel detection)
 
-`freeswitch_channel_duration_seconds` is a histogram of **active channel age in seconds, observed at scrape time**. It is fetched via `api show channels as json` and rebuilt fresh on every scrape (it does not accumulate across scrapes). It is enabled by default; disable it with `--freeswitch.channel-duration.enable=false`, which also skips issuing the underlying command.
+`freeswitch_channel_duration_seconds` is a histogram of **active channel age in seconds, observed at scrape time**. It is fetched via `api show channels as json` and rebuilt fresh on every scrape (it does not accumulate across scrapes). It is enabled by default; disable it with `--no-freeswitch.channel-duration.enable`, which also skips issuing the underlying command.
 
 Default bucket upper bounds (seconds), chosen to include explicit zombie-channel thresholds at 6h/12h/24h:
 
