@@ -56,9 +56,9 @@ Flags:
                                Password for freeswitch event socket.
       --web.config=""          [EXPERIMENTAL] Path to config yaml file that can
                                enable TLS or authentication.
-      --freeswitch.channel-duration.enable
-                               Enable the freeswitch_channel_duration_seconds
-                               histogram of active channel ages. (default: true)
+      --freeswitch.channel-duration.disable
+                               Disable the freeswitch_channel_duration_seconds
+                               histogram of active channel ages. (default: false)
       --freeswitch.channel-duration.buckets="30,60,120,300,600,900,1800,3600,7200,14400,21600,43200,86400,172800"
                                Comma-separated histogram bucket upper bounds
                                (seconds) for freeswitch_channel_duration_seconds.
@@ -227,7 +227,7 @@ List of exposed metrics:
 
 ### Channel duration histogram (zombie channel detection)
 
-`freeswitch_channel_duration_seconds` is a histogram of **active channel age in seconds, observed at scrape time**. It is fetched via `api show channels as json` and rebuilt fresh on every scrape (it does not accumulate across scrapes). It is enabled by default; disable it with `--no-freeswitch.channel-duration.enable`, which also skips issuing the underlying command.
+`freeswitch_channel_duration_seconds` is a histogram of **active channel age in seconds, observed at scrape time**. It is fetched via `api show channels as json` and rebuilt fresh on every scrape (it does not accumulate across scrapes). It is enabled by default; disable it with `--freeswitch.channel-duration.disable`, which also skips issuing the underlying command.
 
 Default bucket upper bounds (seconds), chosen to include explicit zombie-channel thresholds at 6h/12h/24h:
 
