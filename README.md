@@ -56,6 +56,12 @@ Flags:
                                Password for freeswitch event socket.
       --web.config=""          [EXPERIMENTAL] Path to config yaml file that can
                                enable TLS or authentication.
+      --freeswitch.channel-duration.enable
+                               Enable the freeswitch_channel_duration_seconds
+                               histogram of active channel ages. (default: true)
+      --freeswitch.channel-duration.buckets="30,60,120,300,600,900,1800,3600,7200,14400,21600,43200,86400,172800"
+                               Comma-separated histogram bucket upper bounds
+                               (seconds) for freeswitch_channel_duration_seconds.
       --version                Show application version.
 ```
 
@@ -215,6 +221,43 @@ List of exposed metrics:
 # TYPE freeswitch_memory_uordblks gauge
 # HELP freeswitch_memory_usmblks Max. total allocated space
 # TYPE freeswitch_memory_usmblks gauge
+# HELP freeswitch_channel_duration_seconds Age of currently active FreeSWITCH channels in seconds, observed at scrape time.
+# TYPE freeswitch_channel_duration_seconds histogram
+```
+
+### Channel duration histogram (zombie channel detection)
+
+`freeswitch_channel_duration_seconds` is a histogram of **active channel age in seconds, observed at scrape time**. It is fetched via `api show channels as json` and rebuilt fresh on every scrape (it does not accumulate across scrapes). It is enabled by default; disable it with `--freeswitch.channel-duration.enable=false`, which also skips issuing the underlying command.
+
+Default bucket upper bounds (seconds), chosen to include explicit zombie-channel thresholds at 6h/12h/24h:
+
+```
+30, 60, 120, 300, 600, 900, 1800, 3600, 7200, 14400, 21600 (6h), 43200 (12h), 86400 (24h), 172800
+```
+
+Override with `--freeswitch.channel-duration.buckets`, a comma-separated, strictly increasing list of positive values (e.g. `--freeswitch.channel-duration.buckets=30,60,300`). An invalid list (non-numeric, `<= 0`, or not strictly increasing) causes the exporter to fail at startup with an error naming the offending value.
+
+Example output:
+
+```
+# HELP freeswitch_channel_duration_seconds Age of currently active FreeSWITCH channels in seconds, observed at scrape time.
+# TYPE freeswitch_channel_duration_seconds histogram
+freeswitch_channel_duration_seconds_bucket{le="30"} 0
+freeswitch_channel_duration_seconds_bucket{le="60"} 0
+freeswitch_channel_duration_seconds_bucket{le="21600"} 3
+freeswitch_channel_duration_seconds_bucket{le="43200"} 4
+freeswitch_channel_duration_seconds_bucket{le="86400"} 5
+freeswitch_channel_duration_seconds_bucket{le="+Inf"} 5
+freeswitch_channel_duration_seconds_sum 432000
+freeswitch_channel_duration_seconds_count 5
+```
+
+Number of channels older than 6h/12h/24h can be computed with PromQL:
+
+```
+freeswitch_channel_duration_seconds_count - freeswitch_channel_duration_seconds_bucket{le="21600"}  # older than 6h
+freeswitch_channel_duration_seconds_count - freeswitch_channel_duration_seconds_bucket{le="43200"}  # older than 12h
+freeswitch_channel_duration_seconds_count - freeswitch_channel_duration_seconds_bucket{le="86400"}  # older than 24h
 ```
 
 ## Compiling
