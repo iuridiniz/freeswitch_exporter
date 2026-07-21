@@ -5,6 +5,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 // parseBuckets parses a comma-separated list of histogram bucket upper bounds.
@@ -51,4 +53,43 @@ func parseCreatedEpoch(s string) (time.Time, error) {
 	}
 
 	return time.Unix(v, 0), nil
+}
+
+// buildChannelDurationHistogram builds a histogram of active channel ages (in seconds).
+// Skips rows with invalid created_epoch and clamps negative ages to 0.
+func buildChannelDurationHistogram(rows []map[string]any, now time.Time, buckets []float64) (prometheus.Histogram, int) {
+	histogram := prometheus.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespace,
+		Name:      "channel_duration_seconds",
+		Help:      "Age of currently active FreeSWITCH channels in seconds, observed at scrape time.",
+		Buckets:   buckets,
+	})
+
+	skipped := 0
+
+	for _, row := range rows {
+		raw, ok := row["created_epoch"].(string)
+
+		if !ok {
+			skipped++
+			continue
+		}
+
+		start, err := parseCreatedEpoch(raw)
+
+		if err != nil {
+			skipped++
+			continue
+		}
+
+		age := now.Sub(start).Seconds()
+
+		if age < 0 {
+			age = 0
+		}
+
+		histogram.Observe(age)
+	}
+
+	return histogram, skipped
 }
