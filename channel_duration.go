@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // parseBuckets parses a comma-separated list of histogram bucket upper bounds.
@@ -34,4 +35,20 @@ func parseBuckets(s string) ([]float64, error) {
 	}
 
 	return buckets, nil
+}
+
+// parseCreatedEpoch parses a FreeSWITCH created_epoch string (epoch seconds).
+// Returns an error if the value is not a positive decimal integer.
+func parseCreatedEpoch(s string) (time.Time, error) {
+	v, err := strconv.ParseInt(strings.TrimSpace(s), 10, 64)
+
+	if err != nil {
+		return time.Time{}, fmt.Errorf("invalid created_epoch %q: not a decimal integer", s)
+	}
+
+	if v <= 0 {
+		return time.Time{}, fmt.Errorf("invalid created_epoch %q: must be > 0", s)
+	}
+
+	return time.Unix(v, 0), nil
 }
