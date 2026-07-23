@@ -96,6 +96,45 @@ func buildChannelDurationHistogram(rows []map[string]any, now time.Time, buckets
 	return histogram, skipped
 }
 
+// countChannelsByDuration counts, for each threshold, the number of active channels
+// whose age (now - created_epoch) is >= that threshold. Counts are independent per
+// threshold (a channel older than multiple thresholds increments each). Skips rows
+// with missing/invalid created_epoch and clamps negative ages to 0.
+func countChannelsByDuration(rows []map[string]any, now time.Time, thresholds []float64) ([]float64, int) {
+	counts := make([]float64, len(thresholds))
+	skipped := 0
+
+	for _, row := range rows {
+		raw, ok := row["created_epoch"].(string)
+
+		if !ok {
+			skipped++
+			continue
+		}
+
+		start, err := parseCreatedEpoch(raw)
+
+		if err != nil {
+			skipped++
+			continue
+		}
+
+		age := now.Sub(start).Seconds()
+
+		if age < 0 {
+			age = 0
+		}
+
+		for i, threshold := range thresholds {
+			if age >= threshold {
+				counts[i]++
+			}
+		}
+	}
+
+	return counts, skipped
+}
+
 // channelRowsPayload mirrors the JSON shape of "api show channels as json".
 type channelRowsPayload struct {
 	RowCount int              `json:"row_count"`
