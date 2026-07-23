@@ -258,19 +258,23 @@ freeswitch_current_channels_by_duration{threshold_seconds="30"} 3
 freeswitch_current_channels_by_duration{threshold_seconds="60"} 3
 ```
 
-Alert on zombie channels directly, no subtraction needed. Prometheus:
+Alert on zombie channels directly, no subtraction needed:
 
 ```
 freeswitch_current_channels_by_duration{threshold_seconds="21600"} > 0  # 1+ channel older than 6h
 ```
 
-Datadog monitor query:
+#### Estimating short-lived calls (routing issue detection)
+
+`freeswitch_current_channels_by_duration{threshold_seconds="T"}` only counts channels *older than or equal to* `T`. To estimate channels *younger than* the smallest configured threshold (i.e. very short-lived/just-started calls — a canary for dropped calls or routing misconfigurations), subtract it from the total active channel count (`freeswitch_current_channels`):
 
 ```
-avg(last_5m):avg:freeswitch.current_channels_by_duration{threshold_seconds:21600} > 0
+freeswitch_current_channels - freeswitch_current_channels_by_duration{threshold_seconds="30"}  # channels younger than 30s
 ```
 
-**Datadog Autodiscovery note:** if your Agent's OpenMetrics/Autodiscovery metric filter matches `freeswitch_channel_.*`, it will **not** match `freeswitch_current_channels_by_duration`. Update the filter to `freeswitch_current_channels_.*` (or add the exact metric name) so this gauge is picked up.
+With the default thresholds, `30` is the smallest configured value. A sudden, sustained rise in this value compared to normal traffic levels suggests calls are being dropped or misrouted shortly after being established.
+
+If your monitoring filter/allowlist only matches names like `freeswitch_channel_.*`, note it will **not** match `freeswitch_current_channels_by_duration` — update the filter to `freeswitch_current_channels_.*` (or add the exact metric name) so this gauge is picked up.
 
 ## Compiling
 
