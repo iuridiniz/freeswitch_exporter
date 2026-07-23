@@ -42,10 +42,10 @@ func main() {
 		rtpEnable              = kingpin.Flag("rtp.enable", "enable rtp info(feature:todo!), default: fasle").Default("false").Bool()
 		channelDurationDisable = kingpin.Flag(
 			"freeswitch.channel-duration.disable",
-			"Disable the freeswitch_channel_duration_seconds histogram of active channel ages.").Default("false").Bool()
-		channelDurationBucketsFlag = kingpin.Flag(
-			"freeswitch.channel-duration.buckets",
-			"Comma-separated histogram bucket upper bounds (seconds) for freeswitch_channel_duration_seconds.").Default("30,60,120,300,600,900,1800,3600,7200,14400,21600,43200,86400,172800").String()
+			"Disable the freeswitch_current_channels_by_duration gauge of active channel counts by age threshold.").Default("false").Bool()
+		channelDurationThresholdsFlag = kingpin.Flag(
+			"freeswitch.channel-duration.thresholds",
+			"Comma-separated, strictly increasing channel-age thresholds in seconds for freeswitch_current_channels_by_duration.").Default("21600,43200,86400").String()
 	)
 	kingpin.Version("freeswitch_exporter\nversion: 1.0.6")
 	kingpin.Parse()
@@ -58,10 +58,10 @@ func main() {
 	}
 	logger := promlog.New(promlogConfig)
 
-	channelDurationThresholds, err := parseThresholds(*channelDurationBucketsFlag)
+	channelDurationThresholds, err := parseThresholds(*channelDurationThresholdsFlag)
 
 	if err != nil {
-		panic(fmt.Sprintf("invalid --freeswitch.channel-duration.buckets: %v", err))
+		panic(fmt.Sprintf("invalid --freeswitch.channel-duration.thresholds: %v", err))
 	}
 
 	c, err := NewCollector(*scrapeURI, *timeout, *password, *rtpEnable, !*channelDurationDisable, channelDurationThresholds, logger)
