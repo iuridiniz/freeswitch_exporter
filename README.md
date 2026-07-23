@@ -57,11 +57,13 @@ Flags:
       --web.config=""          [EXPERIMENTAL] Path to config yaml file that can
                                enable TLS or authentication.
       --freeswitch.channel-duration.disable
-                               Disable the freeswitch_channel_duration_seconds
-                               histogram of active channel ages. (default: false)
-      --freeswitch.channel-duration.buckets="30,60,120,300,600,900,1800,3600,7200,14400,21600,43200,86400,172800"
-                               Comma-separated histogram bucket upper bounds
-                               (seconds) for freeswitch_channel_duration_seconds.
+                               Disable the
+                               freeswitch_current_channels_by_duration gauge of
+                               active channel counts by age threshold.
+      --freeswitch.channel-duration.thresholds="21600,43200,86400"
+                               Comma-separated, strictly increasing
+                               channel-age thresholds in seconds for
+                               freeswitch_current_channels_by_duration.
       --version                Show application version.
 ```
 
@@ -221,44 +223,45 @@ List of exposed metrics:
 # TYPE freeswitch_memory_uordblks gauge
 # HELP freeswitch_memory_usmblks Max. total allocated space
 # TYPE freeswitch_memory_usmblks gauge
-# HELP freeswitch_channel_duration_seconds Age of currently active FreeSWITCH channels in seconds, observed at scrape time.
-# TYPE freeswitch_channel_duration_seconds histogram
+# HELP freeswitch_current_channels_by_duration Number of currently active FreeSWITCH channels whose age is >= threshold_seconds, observed at scrape time.
+# TYPE freeswitch_current_channels_by_duration gauge
 ```
 
-### Channel duration histogram (zombie channel detection)
+### Current channels by duration (zombie channel detection)
 
-`freeswitch_channel_duration_seconds` is a histogram of **active channel age in seconds, observed at scrape time**. It is fetched via `api show channels as json` and rebuilt fresh on every scrape (it does not accumulate across scrapes). It is enabled by default; disable it with `--freeswitch.channel-duration.disable`, which also skips issuing the underlying command.
+`freeswitch_current_channels_by_duration` is a **gauge family with one series per configured age threshold** (`threshold_seconds` label). Each series' value is the number of currently active channels whose age (`now - created_epoch`) is `>= threshold_seconds`, observed at scrape time — it is fetched via `api show channels as json` and computed fresh on every scrape. Series are independent, not cumulative: a channel older than multiple thresholds is counted in every series it meets (e.g. a 25h-old channel increments the 6h, 12h, and 24h series). It is enabled by default; disable it with `--freeswitch.channel-duration.disable`, which also skips issuing the underlying command.
 
-Default bucket upper bounds (seconds), chosen to include explicit zombie-channel thresholds at 6h/12h/24h:
-
-```
-30, 60, 120, 300, 600, 900, 1800, 3600, 7200, 14400, 21600 (6h), 43200 (12h), 86400 (24h), 172800
-```
-
-Override with `--freeswitch.channel-duration.buckets`, a comma-separated, strictly increasing list of positive values (e.g. `--freeswitch.channel-duration.buckets=30,60,300`). An invalid list (non-numeric, `<= 0`, or not strictly increasing) causes the exporter to fail at startup with an error naming the offending value.
-
-Example output:
+Default thresholds (seconds) — 6h/12h/24h:
 
 ```
-# HELP freeswitch_channel_duration_seconds Age of currently active FreeSWITCH channels in seconds, observed at scrape time.
-# TYPE freeswitch_channel_duration_seconds histogram
-freeswitch_channel_duration_seconds_bucket{le="30"} 0
-freeswitch_channel_duration_seconds_bucket{le="60"} 0
-freeswitch_channel_duration_seconds_bucket{le="21600"} 3
-freeswitch_channel_duration_seconds_bucket{le="43200"} 4
-freeswitch_channel_duration_seconds_bucket{le="86400"} 5
-freeswitch_channel_duration_seconds_bucket{le="+Inf"} 5
-freeswitch_channel_duration_seconds_sum 432000
-freeswitch_channel_duration_seconds_count 5
+21600 (6h), 43200 (12h), 86400 (24h)
 ```
 
-Number of channels older than 6h/12h/24h can be computed with PromQL:
+Override with `--freeswitch.channel-duration.thresholds`, a comma-separated, strictly increasing list of positive values (e.g. `--freeswitch.channel-duration.thresholds=21600,43200,86400`). An invalid list (non-numeric, `<= 0`, or not strictly increasing) causes the exporter to fail at startup with an error naming the offending value.
+
+Example output (3 channels older than every configured threshold):
 
 ```
-freeswitch_channel_duration_seconds_count - freeswitch_channel_duration_seconds_bucket{le="21600"}  # older than 6h
-freeswitch_channel_duration_seconds_count - freeswitch_channel_duration_seconds_bucket{le="43200"}  # older than 12h
-freeswitch_channel_duration_seconds_count - freeswitch_channel_duration_seconds_bucket{le="86400"}  # older than 24h
+# HELP freeswitch_current_channels_by_duration Number of currently active FreeSWITCH channels whose age is >= threshold_seconds, observed at scrape time.
+# TYPE freeswitch_current_channels_by_duration gauge
+freeswitch_current_channels_by_duration{threshold_seconds="10"} 3
+freeswitch_current_channels_by_duration{threshold_seconds="30"} 3
+freeswitch_current_channels_by_duration{threshold_seconds="60"} 3
 ```
+
+Alert on zombie channels directly, no subtraction needed. Prometheus:
+
+```
+freeswitch_current_channels_by_duration{threshold_seconds="21600"} > 0  # 1+ channel older than 6h
+```
+
+Datadog monitor query:
+
+```
+avg(last_5m):avg:freeswitch.current_channels_by_duration{threshold_seconds:21600} > 0
+```
+
+**Datadog Autodiscovery note:** if your Agent's OpenMetrics/Autodiscovery metric filter matches `freeswitch_channel_.*`, it will **not** match `freeswitch_current_channels_by_duration`. Update the filter to `freeswitch_current_channels_.*` (or add the exact metric name) so this gauge is picked up.
 
 ## Compiling
 
