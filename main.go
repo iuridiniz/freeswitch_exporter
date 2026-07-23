@@ -45,7 +45,7 @@ func main() {
 			"Disable the freeswitch_current_channels_by_duration gauge of active channel counts by age threshold.").Default("false").Bool()
 		channelDurationThresholdsFlag = kingpin.Flag(
 			"freeswitch.channel-duration.thresholds",
-			"Comma-separated, strictly increasing channel-age thresholds in seconds for freeswitch_current_channels_by_duration.").Default("21600,43200,86400").String()
+			"Comma-separated, strictly increasing channel-age thresholds in seconds for freeswitch_current_channels_by_duration.").Default("30,60,120,300,600,900,1800,3600,7200,14400,21600,43200,86400,172800").String()
 	)
 	kingpin.Version("freeswitch_exporter\nversion: 1.0.6")
 	kingpin.Parse()
