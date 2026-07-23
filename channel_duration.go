@@ -57,45 +57,6 @@ func parseCreatedEpoch(s string) (time.Time, error) {
 	return time.Unix(v, 0), nil
 }
 
-// buildChannelDurationHistogram builds a histogram of active channel ages (in seconds).
-// Skips rows with invalid created_epoch and clamps negative ages to 0.
-func buildChannelDurationHistogram(rows []map[string]any, now time.Time, buckets []float64) (prometheus.Histogram, int) {
-	histogram := prometheus.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespace,
-		Name:      "channel_duration_seconds",
-		Help:      "Age of currently active FreeSWITCH channels in seconds, observed at scrape time.",
-		Buckets:   buckets,
-	})
-
-	skipped := 0
-
-	for _, row := range rows {
-		raw, ok := row["created_epoch"].(string)
-
-		if !ok {
-			skipped++
-			continue
-		}
-
-		start, err := parseCreatedEpoch(raw)
-
-		if err != nil {
-			skipped++
-			continue
-		}
-
-		age := now.Sub(start).Seconds()
-
-		if age < 0 {
-			age = 0
-		}
-
-		histogram.Observe(age)
-	}
-
-	return histogram, skipped
-}
-
 // countChannelsByDuration counts, for each threshold, the number of active channels
 // whose age (now - created_epoch) is >= that threshold. Counts are independent per
 // threshold (a channel older than multiple thresholds increments each). Skips rows
@@ -152,7 +113,15 @@ func decodeChannelRows(payload []byte) ([]map[string]any, error) {
 	return p.Rows, nil
 }
 
-// channelDurationMetrics fetches channels, builds an age histogram, and emits it.
+var channelDurationDesc = prometheus.NewDesc(
+	namespace+"_current_channels_by_duration",
+	"Number of currently active FreeSWITCH channels whose age is >= threshold_seconds, observed at scrape time.",
+	[]string{"threshold_seconds"},
+	nil,
+)
+
+// channelDurationMetrics fetches channels, counts them per age threshold, and emits
+// one gauge sample per threshold.
 func (c *Collector) channelDurationMetrics(ch chan<- prometheus.Metric) error {
 	response, err := c.fsCommand("api show channels as json")
 
@@ -166,13 +135,26 @@ func (c *Collector) channelDurationMetrics(ch chan<- prometheus.Metric) error {
 		return err
 	}
 
-	histogram, skipped := buildChannelDurationHistogram(rows, time.Now(), c.channelDurationBuckets)
+	counts, skipped := countChannelsByDuration(rows, time.Now(), c.channelDurationBuckets)
 
 	if skipped > 0 {
 		level.Debug(c.logger).Log("msg", "skipped unparseable channel row", "count", skipped)
 	}
 
-	ch <- histogram
+	for i, threshold := range c.channelDurationBuckets {
+		metric, err := prometheus.NewConstMetric(
+			channelDurationDesc,
+			prometheus.GaugeValue,
+			counts[i],
+			strconv.FormatInt(int64(threshold), 10),
+		)
+
+		if err != nil {
+			return err
+		}
+
+		ch <- metric
+	}
 
 	return nil
 }
