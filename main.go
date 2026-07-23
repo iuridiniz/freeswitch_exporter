@@ -39,7 +39,7 @@ func main() {
 			"web.config",
 			"[EXPERIMENTAL] Path to config yaml file that can enable TLS or authentication.",
 		).Default("").String()
-		rtpEnable = kingpin.Flag("rtp.enable", "enable rtp info(feature:todo!), default: fasle").Default("false").Bool()
+		rtpEnable              = kingpin.Flag("rtp.enable", "enable rtp info(feature:todo!), default: fasle").Default("false").Bool()
 		channelDurationDisable = kingpin.Flag(
 			"freeswitch.channel-duration.disable",
 			"Disable the freeswitch_channel_duration_seconds histogram of active channel ages.").Default("false").Bool()
@@ -58,13 +58,13 @@ func main() {
 	}
 	logger := promlog.New(promlogConfig)
 
-	channelDurationBuckets, err := parseBuckets(*channelDurationBucketsFlag)
+	channelDurationThresholds, err := parseThresholds(*channelDurationBucketsFlag)
 
 	if err != nil {
 		panic(fmt.Sprintf("invalid --freeswitch.channel-duration.buckets: %v", err))
 	}
 
-	c, err := NewCollector(*scrapeURI, *timeout, *password, *rtpEnable, !*channelDurationDisable, channelDurationBuckets, logger)
+	c, err := NewCollector(*scrapeURI, *timeout, *password, *rtpEnable, !*channelDurationDisable, channelDurationThresholds, logger)
 
 	if err != nil {
 		panic(err)
@@ -90,7 +90,7 @@ func main() {
 			target = fmt.Sprintf("tcp://%s", target)
 		}
 
-		c, colErr := NewCollector(target, *timeout, *password, *rtpEnable, !*channelDurationDisable, channelDurationBuckets, logger)
+		c, colErr := NewCollector(target, *timeout, *password, *rtpEnable, !*channelDurationDisable, channelDurationThresholds, logger)
 		if colErr != nil {
 			http.Error(w, fmt.Sprintf("failed to create collector for %s: %s", target, colErr), http.StatusInternalServerError)
 		}

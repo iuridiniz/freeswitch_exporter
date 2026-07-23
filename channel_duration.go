@@ -11,12 +11,12 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-// parseBuckets parses a comma-separated list of histogram bucket upper bounds.
+// parseThresholds parses a comma-separated list of channel-age thresholds (seconds).
 // Values must be > 0 and strictly increasing.
-func parseBuckets(s string) ([]float64, error) {
+func parseThresholds(s string) ([]float64, error) {
 	parts := strings.Split(s, ",")
 
-	buckets := make([]float64, 0, len(parts))
+	thresholds := make([]float64, 0, len(parts))
 
 	for _, part := range parts {
 		trimmed := strings.TrimSpace(part)
@@ -24,21 +24,21 @@ func parseBuckets(s string) ([]float64, error) {
 		value, err := strconv.ParseFloat(trimmed, 64)
 
 		if err != nil {
-			return nil, fmt.Errorf("invalid bucket value %q: not a number", trimmed)
+			return nil, fmt.Errorf("invalid threshold value %q: not a number", trimmed)
 		}
 
 		if value <= 0 {
-			return nil, fmt.Errorf("invalid bucket value %q: must be > 0", trimmed)
+			return nil, fmt.Errorf("invalid threshold value %q: must be > 0", trimmed)
 		}
 
-		if len(buckets) > 0 && value <= buckets[len(buckets)-1] {
-			return nil, fmt.Errorf("invalid bucket value %q: buckets must be strictly increasing", trimmed)
+		if len(thresholds) > 0 && value <= thresholds[len(thresholds)-1] {
+			return nil, fmt.Errorf("invalid threshold value %q: thresholds must be strictly increasing", trimmed)
 		}
 
-		buckets = append(buckets, value)
+		thresholds = append(thresholds, value)
 	}
 
-	return buckets, nil
+	return thresholds, nil
 }
 
 // parseCreatedEpoch parses a FreeSWITCH created_epoch string (epoch seconds).
@@ -135,13 +135,13 @@ func (c *Collector) channelDurationMetrics(ch chan<- prometheus.Metric) error {
 		return err
 	}
 
-	counts, skipped := countChannelsByDuration(rows, time.Now(), c.channelDurationBuckets)
+	counts, skipped := countChannelsByDuration(rows, time.Now(), c.channelDurationThresholds)
 
 	if skipped > 0 {
 		level.Debug(c.logger).Log("msg", "skipped unparseable channel row", "count", skipped)
 	}
 
-	for i, threshold := range c.channelDurationBuckets {
+	for i, threshold := range c.channelDurationThresholds {
 		metric, err := prometheus.NewConstMetric(
 			channelDurationDesc,
 			prometheus.GaugeValue,
