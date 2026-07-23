@@ -236,9 +236,8 @@ List of exposed metrics:
 * **Detecting Deadlocks:** Catch zombie channels caused by FreeSWITCH bugs by setting up alerts for channels stuck over a certain threshold (e.g., >6h).
 * **Fraud Detection:** Identify toll fraud or abandoned calls that stay connected indefinitely.
 * **Traffic Profiling:** Analyze call duration distributions to better understand platform usage and plan for trunk capacity.
-* **Routing Issue Detection:** A sudden increase in extremely short calls can act as a canary for systemic call drops or routing misconfigurations.
 
-Default thresholds (seconds), spanning from short-lived calls to zombie-channel ranges — suited for the general profiling/routing/fraud use cases above:
+Default thresholds (seconds), spanning a broad range of ages — suited for the general profiling/fraud use cases above:
 
 ```
 30 (30s), 60 (1m), 120 (2m), 300 (5m), 600 (10m), 900 (15m), 1800 (30m), 3600 (1h), 7200 (2h), 14400 (4h), 21600 (6h), 43200 (12h), 86400 (24h), 172800 (48h)
@@ -263,16 +262,6 @@ Alert on zombie channels directly, no subtraction needed:
 ```
 freeswitch_current_channels_by_duration{threshold_seconds="21600"} > 0  # 1+ channel older than 6h
 ```
-
-#### Estimating short-lived calls (routing issue detection)
-
-`freeswitch_current_channels_by_duration{threshold_seconds="T"}` only counts channels *older than or equal to* `T`. To estimate channels *younger than* the smallest configured threshold (i.e. very short-lived/just-started calls — a canary for dropped calls or routing misconfigurations), subtract it from the total active channel count (`freeswitch_current_channels`):
-
-```
-freeswitch_current_channels - freeswitch_current_channels_by_duration{threshold_seconds="30"}  # channels younger than 30s
-```
-
-With the default thresholds, `30` is the smallest configured value. A sudden, sustained rise in this value compared to normal traffic levels suggests calls are being dropped or misrouted shortly after being established.
 
 If your monitoring filter/allowlist only matches names like `freeswitch_channel_.*`, note it will **not** match `freeswitch_current_channels_by_duration` — update the filter to `freeswitch_current_channels_.*` (or add the exact metric name) so this gauge is picked up.
 
