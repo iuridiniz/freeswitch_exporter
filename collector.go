@@ -329,7 +329,7 @@ func (c *Collector) scrape(ch chan<- prometheus.Metric) error {
 
 	if c.channelDurationEnabled {
 		if err = c.channelDurationMetrics(ch); err != nil {
-			level.Warn(c.logger).Log("msg", "channel duration histogram scrape failed", "err", err)
+			return err
 		}
 	}
 
