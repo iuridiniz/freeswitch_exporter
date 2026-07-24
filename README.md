@@ -137,6 +137,8 @@ List of exposed metrics:
 # TYPE freeswitch_current_calls gauge
 # HELP freeswitch_current_channels Number of channels active
 # TYPE freeswitch_current_channels gauge
+# HELP freeswitch_current_channels_by_duration Number of currently active FreeSWITCH channels whose age is >= threshold_seconds, observed at scrape time.
+# TYPE freeswitch_current_channels_by_duration gauge
 # HELP freeswitch_current_idle_cpu CPU idle
 # TYPE freeswitch_current_idle_cpu gauge
 # HELP freeswitch_current_sessions Number of sessions active
@@ -223,8 +225,6 @@ List of exposed metrics:
 # TYPE freeswitch_memory_uordblks gauge
 # HELP freeswitch_memory_usmblks Max. total allocated space
 # TYPE freeswitch_memory_usmblks gauge
-# HELP freeswitch_current_channels_by_duration Number of currently active FreeSWITCH channels whose age is >= threshold_seconds, observed at scrape time.
-# TYPE freeswitch_current_channels_by_duration gauge
 ```
 
 ## Compiling
