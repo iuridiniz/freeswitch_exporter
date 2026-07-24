@@ -227,44 +227,6 @@ List of exposed metrics:
 # TYPE freeswitch_current_channels_by_duration gauge
 ```
 
-### Current channels by duration
-
-`freeswitch_current_channels_by_duration` is a **gauge family with one series per configured age threshold** (`threshold_seconds` label). Each series' value is the number of currently active channels whose age (`now - created_epoch`) is `>= threshold_seconds`, observed at scrape time — it is fetched via `api show channels as json` and computed fresh on every scrape. Series are independent, not cumulative: a channel older than multiple thresholds is counted in every series it meets (e.g. a 25h-old channel increments the 6h, 12h, and 24h series). It is enabled by default; disable it with `--freeswitch.channel-duration.disable`, which also skips issuing the underlying command.
-
-#### Use cases
-
-* **Detecting Deadlocks:** Catch zombie channels caused by FreeSWITCH bugs by setting up alerts for channels stuck over a certain threshold (e.g., >6h).
-* **Fraud Detection:** Identify toll fraud or abandoned calls that stay connected indefinitely.
-* **Traffic Profiling:** Analyze call duration distributions to better understand platform usage and plan for trunk capacity.
-
-Default thresholds (seconds), spanning a broad range of ages — suited for the general profiling/fraud use cases above:
-
-```
-30 (30s), 60 (1m), 120 (2m), 300 (5m), 600 (10m), 900 (15m), 1800 (30m), 3600 (1h), 7200 (2h), 14400 (4h), 21600 (6h), 43200 (12h), 86400 (24h), 172800 (48h)
-```
-
-If you only care about zombie-channel detection (deadlocks/fraud) and not the shorter-lived traffic-profiling thresholds, override with just the 6h/12h/24h set: `--freeswitch.channel-duration.thresholds=21600,43200,86400` (`21600 (6h), 43200 (12h), 86400 (24h)`).
-
-Override with `--freeswitch.channel-duration.thresholds`, a comma-separated, strictly increasing list of positive values. An invalid list (non-numeric, `<= 0`, or not strictly increasing) causes the exporter to fail at startup with an error naming the offending value.
-
-Example output (3 channels older than every configured threshold):
-
-```
-# HELP freeswitch_current_channels_by_duration Number of currently active FreeSWITCH channels whose age is >= threshold_seconds, observed at scrape time.
-# TYPE freeswitch_current_channels_by_duration gauge
-freeswitch_current_channels_by_duration{threshold_seconds="10"} 3
-freeswitch_current_channels_by_duration{threshold_seconds="30"} 3
-freeswitch_current_channels_by_duration{threshold_seconds="60"} 3
-```
-
-Alert on zombie channels directly, no subtraction needed:
-
-```
-freeswitch_current_channels_by_duration{threshold_seconds="21600"} > 0  # 1+ channel older than 6h
-```
-
-If your monitoring filter/allowlist only matches names like `freeswitch_channel_.*`, note it will **not** match `freeswitch_current_channels_by_duration` — update the filter to `freeswitch_current_channels_.*` (or add the exact metric name) so this gauge is picked up.
-
 ## Compiling
 
 With go 1.20+, clone the project and:
